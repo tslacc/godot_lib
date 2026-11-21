@@ -1,4 +1,6 @@
 shader_type sky;
+#include "res://Assets/Shader/libs/masks.gdshaderinc"
+#include "res://Assets/Shader/libs/colordefs.gdshaderinc"
 group_uniforms sun;
 uniform vec3 sunColor : source_color = vec3(0.851,0.566,0.282);
 uniform float sunAmplify : hint_range(1, 20, 1) = 10.0;
@@ -20,27 +22,12 @@ uniform vec3 dayColor : source_color = vec3(0.3,0.59,0.79);
 uniform vec3 nightColor : source_color = vec3(0.658,0.658,0.658);
 uniform vec3 horizonColor : source_color = vec3(0.871, 0.456, 0.18);
 group_uniforms rainbow;
-uniform float rainbowRadius : hint_range(0.0, 1.0, 0.1) = 0.8;
-uniform float rainbowWidth : hint_range(0.0, 1.0, 0.1) = 0.1;
-uniform float rainbowFalloff : hint_range(1.0, 2048, 0.1) = 128;
+uniform float rainbowRadius : hint_range(0.1, 0.35, 0.05) = 0.8;
+uniform float rainbowWidth : hint_range(0.05, 0.1, 0.005) = 0.1;
+uniform float rainbowSharpness : hint_range(1.0, 2048, 0.1) = 128;
 uniform float rainbowAmplify : hint_range(0.0, 1.0, 0.1) = 0.2;
-//Arctangent threshold macro
-#define ATT(INPUT,OFFSET,SHARP) (atan(##SHARP*(##INPUT-(##OFFSET)))/PI+0.5)
-// f(x<=0) = 0, f(0<x<=1) = x, f(1<=x) = 1
-#define RAMP(INPUT) (step(0, ##INPUT)*##INPUT - step(0, ##INPUT-1.0)*(##INPUT-1.0))
-float ramp(float x){
-	return (step(0, x)*x - step(0, x-1.0)*(x-1.0));
-}
-vec3 rainbowColor(float x){
-	vec3 result = vec3(0);
-	result.r = 1.0-ramp((x-1.0/6.0)*6.0)+ramp((x-4.0/6.0)*6.0);
-	result.g = ramp((x)*6.0)-ramp((x-0.5)*6.0);
-	result.b = ramp((x-2.0/6.0)*6.0)-ramp((x-5.0/6.0)*6.0);
-	return result;
-}
-float atanRingMask(float input, float center, float width, float sharp){
-	return ATT(input+width, center, sharp) - ATT(input-width, center, sharp);
-}
+
+
 void sky() {
 	if (!AT_CUBEMAP_PASS){
 		COLOR = texture(RADIANCE, EYEDIR).rgb;
@@ -65,12 +52,11 @@ void sky() {
 		}
 		if(rainbowAmplify>0.0 || true){
 			#define rainbowPos (dot(EYEDIR, vec3(-LIGHT0_DIRECTION.x, LIGHT0_DIRECTION.y, -LIGHT0_DIRECTION.z)))
-			#define rainbowMask (ATT(rainbowPos, rainbowRadius-rainbowWidth, 128.0)-ATT(rainbowPos, rainbowRadius, 128.0))
-			result += rainbowAmplify*rainbowMask*rainbowColor(1.0-(rainbowRadius-rainbowPos)/rainbowWidth)*atanRingMask(LIGHT0_DIRECTION.y, 0, 0.1, 128.0);
+			#define rainbowMask (ATT(rainbowPos, (1.0-rainbowRadius)-rainbowWidth, rainbowSharpness)-ATT(rainbowPos, (1.0-rainbowRadius), rainbowSharpness))
+			result += rainbowAmplify*rainbowMask*rainbowColor(1.0-(1.0-rainbowRadius-rainbowPos)/rainbowWidth)*atanRingMask(LIGHT0_DIRECTION.y, 0, 0.1, 128.0);
 			#undef rainbowPos
 			#undef rainbowMask
 		}
-			
 		COLOR = result;
 	}
 }	
